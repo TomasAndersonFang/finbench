@@ -1,0 +1,61 @@
+# Equity-quant repo registry.
+#
+# numpy/pandas are pinned for determinism (invariant 5): tight-tolerance
+# financial tests flip across environments otherwise. The base image installs
+# the repo, then forces these pins on top.
+#
+# Owners and install steps are starting points: verify owner, default branch,
+# and build deps against the live repo before a large run. For M1 only
+# empyrical-reloaded is exercised; the engine repos (zipline, qlib) additionally
+# need a frozen data bundle baked into the image before their data tests run.
+
+repos:
+  # --- Pure-computation, value-based-verifier friendly (primary) ---
+  - name: empyrical-reloaded
+    repo: stefan-jansen/empyrical-reloaded
+    default_branch: main
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .
+
+  - name: alphalens-reloaded
+    repo: stefan-jansen/alphalens-reloaded
+    default_branch: main
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .
+
+  - name: PyPortfolioOpt
+    # The project moved from robertmartin8/ to the PyPortfolio/ org and renamed
+    # its default branch to main. github.com redirects the old path on clone,
+    # but the search API does not follow the redirect, so pin the canonical name.
+    repo: PyPortfolio/PyPortfolioOpt
+    default_branch: main
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .
+
+  # --- Engine-level, heavier (secondary; need a frozen data bundle) ---
+  - name: zipline-reloaded
+    repo: stefan-jansen/zipline-reloaded
+    default_branch: main
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .
+
+  - name: qlib
+    repo: microsoft/qlib
+    default_branch: main
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .

@@ -1,0 +1,131 @@
+id: empyrical-annualized-sharpe
+repo: stefan-jansen/empyrical-reloaded
+base_commit: efe60664f0abd957074b0751ef82228594a659a5
+change_type: feature
+finance_tags:
+  - annualization
+  - precision
+
+instruction: |
+  Add an annualized Sharpe ratio helper to the empyrical package.
+
+  Create a new module `src/empyrical/annual_metrics.py` that exposes a function:
+
+      annual_sharpe_ratio(returns, risk_free=0.0, period="daily")
+
+  It must be importable as:
+
+      from empyrical.annual_metrics import annual_sharpe_ratio
+
+  Semantics:
+    - `returns` is a sequence (list, numpy array, or pandas Series) of
+      per-period simple returns.
+    - Compute excess returns as `returns - risk_free`, where `risk_free` is a
+      per-period rate.
+    - The per-period Sharpe is the mean of the excess returns divided by their
+      sample standard deviation (ddof=1).
+    - Annualize by multiplying the per-period Sharpe by the square root of the
+      annualization factor for `period`:
+          daily -> 252, weekly -> 52, monthly -> 12.
+    - Drop NaN observations before computing.
+    - If fewer than 2 valid observations remain, return NaN.
+    - If the standard deviation of excess returns is 0, return NaN.
+    - If `period` is not one of the supported values, raise ValueError.
+    - Return a plain Python float (NaN as float NaN).
+
+  Do not modify existing modules; add the new file only.
+
+gold_files:
+  src/empyrical/annual_metrics.py: |
+    """Annualized risk-adjusted return metrics."""
+
+    from __future__ import annotations
+
+    import numpy as np
+
+    ANNUALIZATION_FACTORS = {"daily": 252, "weekly": 52, "monthly": 12}
+
+
+    def annual_sharpe_ratio(returns, risk_free=0.0, period="daily"):
+        """Annualized Sharpe ratio of a per-period returns series.
+
+        Excess return mean over sample std (ddof=1), scaled by the square root
+        of the annualization factor for ``period``.
+        """
+        if period not in ANNUALIZATION_FACTORS:
+            raise ValueError(
+                f"unknown period {period!r}; expected one of "
+                f"{sorted(ANNUALIZATION_FACTORS)}"
+            )
+        factor = ANNUALIZATION_FACTORS[period]
+
+        arr = np.asarray(returns, dtype=float)
+        arr = arr[~np.isnan(arr)]
+        if arr.size < 2:
+            return float("nan")
+
+        excess = arr - risk_free
+        std = excess.std(ddof=1)
+        if std == 0:
+            return float("nan")
+
+        return float(excess.mean() / std * np.sqrt(factor))
+
+test_files:
+  tests/test_annual_sharpe.py: |
+    import numpy as np
+    import pytest
+
+    from empyrical.annual_metrics import annual_sharpe_ratio
+
+    # Deterministic input (no RNG, invariant 5): a fixed daily returns series.
+    DAILY = np.array(
+        [0.01, -0.02, 0.03, 0.005, -0.015, 0.02, 0.0, 0.01, -0.005, 0.025]
+    )
+    # Independently computed reference: mean/std(ddof=1) * sqrt(252).
+    REFERENCE_DAILY_SHARPE = 5.784660325547838
+
+
+    def test_daily_reference_value():
+        got = annual_sharpe_ratio(DAILY, period="daily")
+        assert got == pytest.approx(REFERENCE_DAILY_SHARPE, rel=1e-9)
+
+
+    def test_period_scaling():
+        daily = annual_sharpe_ratio(DAILY, period="daily")
+        monthly = annual_sharpe_ratio(DAILY, period="monthly")
+        assert monthly == pytest.approx(daily * np.sqrt(12 / 252), rel=1e-9)
+
+
+    def test_risk_free_reduces_positive_sharpe():
+        base = annual_sharpe_ratio(DAILY, period="daily")
+        with_rf = annual_sharpe_ratio(DAILY, risk_free=0.001, period="daily")
+        assert with_rf < base
+
+
+    def test_too_few_observations_is_nan():
+        assert np.isnan(annual_sharpe_ratio([0.01], period="daily"))
+
+
+    def test_zero_volatility_is_nan():
+        assert np.isnan(annual_sharpe_ratio([0.01, 0.01, 0.01], period="daily"))
+
+
+    def test_unknown_period_raises():
+        with pytest.raises(ValueError):
+            annual_sharpe_ratio(DAILY, period="hourly")
+
+
+    def test_nans_are_dropped():
+        with_nan = np.array(
+            [0.01, -0.02, 0.03, 0.005, -0.015, 0.02, np.nan, 0.01, -0.005, 0.025, np.nan]
+        )
+        clean = np.array(
+            [0.01, -0.02, 0.03, 0.005, -0.015, 0.02, 0.01, -0.005, 0.025]
+        )
+        assert annual_sharpe_ratio(with_nan) == pytest.approx(
+            annual_sharpe_ratio(clean), rel=1e-9
+        )
+
+expected_fail_to_pass:
+  - tests/test_annual_sharpe.py::test_daily_reference_value

@@ -1,0 +1,24 @@
+[project]
+name = "finbench"
+version = "0.1.0"
+description = "Automated pipeline for synthesizing and validating finance (equity-quant) coding-agent tasks."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31",
+    "PyYAML>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-json-report>=1.5",
+]
+
+# This is an application, not a library to publish, so run in non-package mode.
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

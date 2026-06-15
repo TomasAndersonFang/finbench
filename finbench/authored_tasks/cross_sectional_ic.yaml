@@ -1,0 +1,106 @@
+id: alphalens-cross-sectional-ic
+repo: stefan-jansen/alphalens-reloaded
+base_commit: f0a07c22d554e4b4036983cc80320b432714fe7e
+change_type: feature
+finance_tags:
+  - cross_sectional
+
+instruction: |
+  Add a cross-sectional information coefficient (IC) helper to alphalens.
+
+  Create a new module `src/alphalens/cross_sectional.py` exposing:
+
+      information_coefficient(factor, forward_returns)
+      mean_information_coefficient(factor, forward_returns)
+
+  importable as:
+
+      from alphalens.cross_sectional import (
+          information_coefficient,
+          mean_information_coefficient,
+      )
+
+  Data layout:
+    - `factor` and `forward_returns` are 2-D panels (pandas DataFrame or
+      anything DataFrame() accepts) with one row per date and one column per
+      asset.
+
+  Semantics:
+    - The information coefficient on a given date is the cross-sectional
+      Spearman rank correlation, across assets, between the factor values and
+      the forward returns on that date. Compute it by ranking each row and
+      taking the Pearson correlation of the ranks.
+    - `information_coefficient` returns a pandas Series with one IC per date.
+    - `mean_information_coefficient` returns the mean of those daily ICs as a
+      plain Python float.
+
+  Do not modify existing modules; add the new file only.
+
+gold_files:
+  src/alphalens/cross_sectional.py: |
+    """Cross-sectional (rank) information coefficient."""
+
+    from __future__ import annotations
+
+    import pandas as pd
+
+
+    def information_coefficient(factor, forward_returns):
+        """Per-date cross-sectional Spearman rank IC across assets."""
+        factor = pd.DataFrame(factor)
+        forward_returns = pd.DataFrame(forward_returns)
+        ranked_factor = factor.rank(axis=1)
+        ranked_returns = forward_returns.rank(axis=1)
+        return ranked_factor.corrwith(ranked_returns, axis=1)
+
+
+    def mean_information_coefficient(factor, forward_returns):
+        """Mean of the per-date information coefficients."""
+        return float(information_coefficient(factor, forward_returns).mean())
+
+test_files:
+  tests/test_cross_sectional_ic.py: |
+    import numpy as np
+    import pandas as pd
+    import pytest
+
+    from alphalens.cross_sectional import (
+        information_coefficient,
+        mean_information_coefficient,
+    )
+
+    IC_MEAN = 0.36666666666666653
+
+    # Seeded panel (invariant 5): factor and a partly-correlated forward return.
+    def _panel():
+        rng = np.random.default_rng(7)
+        factor = pd.DataFrame(rng.normal(size=(6, 5)))
+        forward = pd.DataFrame(0.5 * factor.values + rng.normal(size=(6, 5)))
+        return factor, forward
+
+
+    def test_mean_ic_reference_value():
+        factor, forward = _panel()
+        assert mean_information_coefficient(factor, forward) == pytest.approx(
+            IC_MEAN, rel=1e-9
+        )
+
+
+    def test_one_ic_per_date():
+        factor, forward = _panel()
+        assert len(information_coefficient(factor, forward)) == 6
+
+
+    def test_perfect_rank_correlation_is_one():
+        f = pd.DataFrame([[1.0, 2.0, 3.0, 4.0]])
+        r = pd.DataFrame([[10.0, 20.0, 30.0, 40.0]])
+        assert mean_information_coefficient(f, r) == pytest.approx(1.0, rel=1e-12)
+
+
+    def test_reversed_rank_correlation_is_minus_one():
+        f = pd.DataFrame([[1.0, 2.0, 3.0, 4.0]])
+        r = pd.DataFrame([[40.0, 30.0, 20.0, 10.0]])
+        assert mean_information_coefficient(f, r) == pytest.approx(-1.0, rel=1e-12)
+
+expected_fail_to_pass:
+  - tests/test_cross_sectional_ic.py::test_mean_ic_reference_value

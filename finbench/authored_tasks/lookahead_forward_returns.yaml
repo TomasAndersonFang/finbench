@@ -1,0 +1,108 @@
+id: alphalens-lookahead-forward-returns
+repo: stefan-jansen/alphalens-reloaded
+base_commit: f0a07c22d554e4b4036983cc80320b432714fe7e
+change_type: feature
+finance_tags:
+  - lookahead
+
+instruction: |
+  Add a look-ahead-free forward returns helper to the alphalens package.
+
+  Create a new module `src/alphalens/lookahead.py` that exposes:
+
+      forward_returns(prices, periods=1)
+
+  importable as:
+
+      from alphalens.lookahead import forward_returns
+
+  Semantics:
+    - `prices` is a sequence (list, numpy array, or pandas Series) of price
+      levels ordered from oldest to newest.
+    - The forward return labeled at time t is the simple return realized over
+      the NEXT `periods` steps:
+          r_t = prices[t + periods] / prices[t] - 1
+    - Return a pandas Series aligned to the input index. The last `periods`
+      observations have no future price and must be NaN.
+    - This is a forward-looking label, not a backward `pct_change`: r_t must use
+      prices strictly after t, so the first element is defined (not NaN) while
+      a backward return's first element would be NaN.
+    - `periods` must be >= 1; otherwise raise ValueError.
+
+  Do not modify existing modules; add the new file only.
+
+gold_files:
+  src/alphalens/lookahead.py: |
+    """Forward returns computed without look-ahead bias."""
+
+    from __future__ import annotations
+
+    import pandas as pd
+
+
+    def forward_returns(prices, periods=1):
+        """Forward simple returns: r_t = prices[t + periods] / prices[t] - 1.
+
+        The label at t uses only prices strictly after t. The last ``periods``
+        observations are NaN (no future price available).
+        """
+        if periods < 1:
+            raise ValueError("periods must be >= 1")
+        prices = pd.Series(prices).astype(float)
+        return prices.shift(-periods) / prices - 1.0
+
+test_files:
+  tests/test_lookahead.py: |
+    import numpy as np
+    import pandas as pd
+    import pytest
+
+    from alphalens.lookahead import forward_returns
+
+    # Seeded, deterministic price path (invariant 5).
+    def _prices():
+        rng = np.random.default_rng(20240601)
+        rets = rng.normal(0, 0.01, size=8)
+        return pd.Series(100 * np.cumprod(1 + rets))
+
+    FWD1_0 = 0.004693207943803124
+    FWD1_3 = -0.001446904068952648
+    FWD1_SUM = 0.0194869474062348
+    FWD2_0 = -0.0017671764579889615
+
+
+    def test_forward_return_reference_values():
+        fwd = forward_returns(_prices(), 1)
+        assert fwd.iloc[0] == pytest.approx(FWD1_0, rel=1e-9)
+        assert fwd.iloc[3] == pytest.approx(FWD1_3, rel=1e-9)
+        assert np.nansum(fwd.values) == pytest.approx(FWD1_SUM, rel=1e-9)
+
+
+    def test_two_period_forward_reference_value():
+        fwd = forward_returns(_prices(), 2)
+        assert fwd.iloc[0] == pytest.approx(FWD2_0, rel=1e-9)
+
+
+    def test_tail_is_nan():
+        p = _prices()
+        assert np.isnan(forward_returns(p, 1).iloc[-1])
+        fwd2 = forward_returns(p, 2)
+        assert np.isnan(fwd2.iloc[-1]) and np.isnan(fwd2.iloc[-2])
+
+
+    def test_forward_uses_future_not_past():
+        p = _prices()
+        fwd = forward_returns(p, 1)
+        backward = p.pct_change()
+        # Forward return at t equals the backward return realized at t+1.
+        assert fwd.iloc[0] == pytest.approx(backward.iloc[1], rel=1e-9)
+        assert not np.isnan(fwd.iloc[0])
+        assert np.isnan(backward.iloc[0])
+
+
+    def test_invalid_periods_raises():
+        with pytest.raises(ValueError):
+            forward_returns(_prices(), 0)
+
+expected_fail_to_pass:
+  - tests/test_lookahead.py::test_forward_return_reference_values

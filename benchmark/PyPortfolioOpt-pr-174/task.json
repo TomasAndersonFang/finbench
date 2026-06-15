@@ -1,0 +1,33 @@
+{
+  "task_id": "PyPortfolioOpt-pr-174",
+  "repo": "PyPortfolio/PyPortfolioOpt",
+  "base_commit": "ed9b77e23bb4dc12599143516b52b19f0a42fe46",
+  "instruction": "Use appropriate return compounding\n\nIssue: #166 \r\n\r\nFor return series `r = (r1, r2, r3)` and `frequency=1`,\r\n\r\nCurrent compounded return = `(r1 + r2 + r3) / 3`\r\n\r\nProposed compounded return = `(1+r1)(1+r2)(1+r3) ^ (1/3) - 1`\r\n\r\nUTs are sensitive to the changes. One UT has been removed completely because of irrelevance.",
+  "gold_patch": "diff --git a/pypfopt/expected_returns.py b/pypfopt/expected_returns.py\nindex 6724716e..7e2e2952 100644\n--- a/pypfopt/expected_returns.py\n+++ b/pypfopt/expected_returns.py\n@@ -124,7 +124,7 @@ def mean_historical_return(\n     else:\n         returns = returns_from_prices(prices)\n     if compounding:\n-        return (1 + returns.mean()) ** frequency - 1\n+        return (1 + returns).prod() ** (frequency / returns.count()) - 1\n     else:\n         return returns.mean() * frequency\n \n@@ -236,7 +236,9 @@ def capm_return(\n     betas = betas.drop(\"mkt\")\n     # Find mean market return on a given time period\n     if compounding:\n-        mkt_mean_ret = (1 + returns[\"mkt\"].mean()) ** frequency - 1\n+        mkt_mean_ret = (1 + returns[\"mkt\"]).prod() ** (\n+            frequency / returns[\"mkt\"].count()\n+        ) - 1\n     else:\n         mkt_mean_ret = returns[\"mkt\"].mean() * frequency\n \n",
+  "test_patch": "diff --git a/tests/test_expected_returns.py b/tests/test_expected_returns.py\nindex e05ae0f0..92e2b859 100644\n--- a/tests/test_expected_returns.py\n+++ b/tests/test_expected_returns.py\n@@ -55,19 +55,14 @@ def test_mean_historical_returns_dummy():\n         ]\n     )\n     mean = expected_returns.mean_historical_return(data, frequency=1)\n-    test_answer = pd.Series([0.00865598, 0.025, 0.01286968, -0.03632333])\n+    test_answer = pd.Series([0.0086559, 0.0250000, 0.0128696, -0.03632332])\n     pd.testing.assert_series_equal(mean, test_answer)\n+\n     mean = expected_returns.mean_historical_return(data, compounding=True, frequency=1)\n+    test_answer = pd.Series([0.0061922, 0.0241136, 0.0122722, -0.0421775])\n     pd.testing.assert_series_equal(mean, test_answer)\n \n \n-def test_mean_historical_returns_compounding():\n-    df = get_data()\n-    mean = expected_returns.mean_historical_return(df)\n-    mean2 = expected_returns.mean_historical_return(df, compounding=True)\n-    assert (mean2 >= mean).all()\n-\n-\n def test_mean_historical_returns():\n     df = get_data()\n     mean = expected_returns.mean_historical_return(df)\n@@ -193,26 +188,26 @@ def test_capm_with_benchmark():\n     assert mu.dtype == \"float64\"\n     correct_mu = np.array(\n         [\n-            0.10903299,\n-            0.11891232,\n-            0.0659977,\n-            0.07369941,\n-            0.15948144,\n-            0.12308759,\n-            0.15907944,\n-            0.08680978,\n-            0.15778843,\n-            0.0903294,\n-            0.09043133,\n-            0.14716681,\n-            0.12510181,\n-            0.0927869,\n-            0.10990104,\n-            0.12317033,\n-            0.13596521,\n-            0.09344662,\n-            0.15457909,\n-            0.11430041,\n+            0.09115799,\n+            0.09905387,\n+            0.05676282,\n+            0.06291827,\n+            0.131478,\n+            0.10239088,\n+            0.13115671,\n+            0.0733965,\n+            0.13012489,\n+            0.07620949,\n+            0.07629095,\n+            0.12163575,\n+            0.10400071,\n+            0.0781736,\n+            0.09185177,\n+            0.10245701,\n+            0.11268308,\n+            0.07870087,\n+            0.12755988,\n+            0.09536789,\n         ]\n     )\n     np.testing.assert_array_almost_equal(mu.values, correct_mu)\n",
+  "change_type": "feature",
+  "source": "mined",
+  "finance_tags": [
+    "annualization"
+  ],
+  "fail_to_pass": [
+    "tests/test_expected_returns.py::test_capm_with_benchmark",
+    "tests/test_expected_returns.py::test_mean_historical_returns_dummy"
+  ],
+  "pass_to_pass": [
+    "tests/test_expected_returns.py::test_capm_no_benchmark",
+    "tests/test_expected_returns.py::test_ema_historical_return",
+    "tests/test_expected_returns.py::test_ema_historical_return_frequency",
+    "tests/test_expected_returns.py::test_ema_historical_return_limit",
+    "tests/test_expected_returns.py::test_log_returns_from_prices",
+    "tests/test_expected_returns.py::test_mean_historical_returns",
+    "tests/test_expected_returns.py::test_mean_historical_returns_frequency",
+    "tests/test_expected_returns.py::test_mean_historical_returns_type_warning",
+    "tests/test_expected_returns.py::test_prices_from_returns",
+    "tests/test_expected_returns.py::test_return_model_additional_kwargs",
+    "tests/test_expected_returns.py::test_return_model_not_implemented",
+    "tests/test_expected_returns.py::test_returns_from_prices",
+    "tests/test_expected_returns.py::test_risk_matrix_and_returns_data"
+  ],
+  "image": "finbench-pyportfolioopt:base"
+}
