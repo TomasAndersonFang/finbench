@@ -30,6 +30,39 @@ Each validated task is written to `benchmark/<task_id>/task.json`. A task is
 written only if it passes the soundness gate: at least one test fails on
 `base_commit + test_patch` and passes once the gold patch is applied.
 
+## Evaluate an LLM agent
+
+Two decoupled halves: an **agent runner** produces a candidate patch per task,
+and a provider-agnostic **evaluator** grades it. They communicate through a
+predictions file (`{task_id: patch}`), so any agent (any model, or an external
+framework) can be scored the same way.
+
+Grading rule: a task is RESOLVED when, with the agent's patch applied plus the
+held-out `test_patch`, every F2P test and every P2P test passes. The agent sees
+only the instruction and the repo at `base_commit`, never the gold or test
+patches; edits it makes to test files are discarded before grading.
+
+```bash
+# 0. Serve the model with vLLM (tool calling must be enabled for the bash tool):
+vllm serve Qwen/Qwen3.6-35B-A3B --enable-auto-tool-choice --tool-call-parser hermes
+
+# 1. Run the agent. Defaults to Qwen/Qwen3.6-35B-A3B on a local vLLM server
+#    (http://localhost:8000/v1), so no env vars are needed:
+uv run python -m finbench.agents.loop --out preds.json
+#    For another model/endpoint, override via env (DeepSeek shown; also OpenAI,
+#    Groq, Together, OpenRouter, ...):
+FINBENCH_MODEL=deepseek-chat FINBENCH_BASE_URL=https://api.deepseek.com \
+  FINBENCH_API_KEY=$DEEPSEEK_API_KEY uv run python -m finbench.agents.loop --out preds.json
+
+# 2. Grade the predictions
+uv run python -m finbench.evaluator --predictions preds.json
+```
+
+The evaluator also grades a predictions file from any other source (an external
+agent framework, a human), as long as it is `{task_id: unified_diff}` (the
+SWE-bench list form is accepted too). Add `--task <id>` to either command to run
+a single task.
+
 ## Verify a task by hand
 
 To watch a task's two-phase check run in its Docker base image (the code before
@@ -126,6 +159,8 @@ finbench/providers.py     AuthoredProvider + GitHubPRProvider
 finbench/builder.py       one base image per repo, built lazily
 finbench/validator.py     discover F2P/P2P in a container, enforce soundness
 finbench/mutation.py      mutation check: perturb gold, confirm tests turn red
+finbench/evaluator.py     grade agent predictions (provider-agnostic)
+finbench/agents/          provider-agnostic agent loop + LLM backends
 finbench/pipeline.py      collect -> build -> validate -> finalize
 finbench/cli.py           CLI entrypoint
 finbench/repos.yaml       equity-quant repo registry
