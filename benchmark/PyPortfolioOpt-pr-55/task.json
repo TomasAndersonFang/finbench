@@ -1,0 +1,47 @@
+{
+  "task_id": "PyPortfolioOpt-pr-55",
+  "repo": "PyPortfolio/PyPortfolioOpt",
+  "base_commit": "9d33f7256bcdc79e47d9746d8b0e135b69c61d71",
+  "instruction": "Add Black-Litterman model\n\nThis implements the [Black-Litterman model](https://en.wikipedia.org/wiki/Black%E2%80%93Litterman_model), as discussed in #48 (a previous PR can be found at #53). Basically, it implements and (minimally) tests two functions:\r\n\r\n- `expected_returns.black_litterman_return`\r\n- `risk_models.black_litterman_cov` [as found in [He and Litterman (2002)](https://dx.doi.org/10.2139/ssrn.334304)]\r\n\r\nImplementation is based on equations (11) and (16) from [here](https://fam.tuwien.ac.at/~sgerhold/pub_files/sem16/s_polovenko.pdf) (further references can be found in this document as well).\r\n\r\nTo make it as easy to use as possible, while retaining the full functionality of the implementation,\r\n\r\n- I kept variable names as close as possible to the standard literature;\r\n- I made extensive use of default values (particularly for `Omega`, `P` and `tau`). For this, I used common choices such as `P` being identity and `tau` equal to `0.05`. All defaults were taken from the choices made in [this work](http://lup.lub.lu.se/luur/download?func=downloadFile&recordOId=5472145&fileOId=5472158).\r\n\r\nThere are probably more to be done such as documentation (we need equations and references!) and more tests (particularly, we might need to test, at least, the usage of views `Q` in `expected_returns.black_litterman_return`). I'm open to suggestions on both.",
+  "gold_patch": "diff --git a/pypfopt/expected_returns.py b/pypfopt/expected_returns.py\nindex 76d8c7cf..8f52162e 100644\n--- a/pypfopt/expected_returns.py\n+++ b/pypfopt/expected_returns.py\n@@ -18,6 +18,7 @@\n \"\"\"\n \n import warnings\n+import numpy as np\n import pandas as pd\n \n \n@@ -91,3 +92,39 @@ def ema_historical_return(prices, frequency=252, span=500):\n         prices = pd.DataFrame(prices)\n     returns = returns_from_prices(prices)\n     return returns.ewm(span=span).mean().iloc[-1] * frequency\n+\n+\n+def black_litterman_return(Pi, Sigma, Q, Omega=None, P=None, tau=0.05):\n+    r\"\"\"\n+    Calculate the expected return according to the Black-Litterman model.\n+\n+    This function receives a previous estimate of the implied equilibrum return for each asset.\n+\n+    :param Pi: the implied equilibrum return for each asset\n+    :type Pi: pd.Series\n+    :param Sigma: the (symmetric) covariance matrix estimate\n+    :type Sigma: pd.DataFrame\n+    :param Q: the estimated return vector for every different view\n+    :type Q: pd.Series\n+    :param Omega: a (diagonal) matrix that identifies the uncertainty in the views (default is the diagonal of :math:`\\tau P \\Sigma P^T`)\n+    :type Omega: pd.DataFrame, optional\n+    :param P: the matrix that identifies the asset involved in the different views (default is identity)\n+    :type P: pd.DataFrame, optional\n+    :param tau: the weight-on-views scalar (default is 0.05)\n+    :type tau: float, optional\n+    :return: the new combined return for each asset\n+    :rtype: pd.Series\n+    \"\"\"\n+    if P is None:\n+        P = np.eye(Sigma.shape[0])\n+    if Omega is None:\n+        Omega = np.diag(np.diag(tau * P @ Sigma @ P.T))\n+\n+    Omega_inv = np.diag(1.0 / np.diag(Omega))\n+    P_Omega_inv = P.T @ Omega_inv\n+    tau_Sigma_inv = np.linalg.inv(tau * Sigma)\n+\n+    A = tau_Sigma_inv + P_Omega_inv @ P\n+    b = tau_Sigma_inv.dot(Pi) + P_Omega_inv.dot(Q)\n+    x = np.linalg.solve(A, b)\n+    return pd.Series(x, index=Pi.index)\ndiff --git a/pypfopt/risk_models.py b/pypfopt/risk_models.py\nindex 4b143f96..e6b13aa1 100644\n--- a/pypfopt/risk_models.py\n+++ b/pypfopt/risk_models.py\n@@ -154,6 +154,42 @@ def min_cov_determinant(prices, frequency=252, random_state=None):\n     return pd.DataFrame(raw_cov_array, index=assets, columns=assets) * frequency\n \n \n+def black_litterman_cov(Sigma, Omega=None, P=None, tau=0.05):\n+    \"\"\"\n+    Calculate the expected posterior covariance matrix according to the Black-Litterman model.\n+\n+    This function receives a previous estimate of the covariance matrix.\n+\n+    :param Sigma: the (symmetric) covariance matrix estimate\n+    :type Sigma: pd.DataFrame\n+    :param Omega: a (diagonal) matrix that identifies the uncertainty in the views (default is the diagonal of :math:`\\tau P \\Sigma P^T`)\n+    :type Omega: pd.DataFrame, optional\n+    :param P: the matrix that identifies the asset involved in the different views (default is identity)\n+    :type P: pd.DataFrame, optional\n+    :param tau: the weight-on-views scalar (default is 0.05)\n+    :type tau: float, optional\n+    :return: the expected posterior covariance matrix\n+    :rtype: pd.DataFrame\n+    \"\"\"\n+    if P is None:\n+        P = np.eye(Sigma.shape[0])\n+    if Omega is None:\n+        Omega = np.diag(np.diag(tau * P @ Sigma @ P.T))\n+\n+    Omega_inv = np.diag(1.0 / np.diag(Omega))\n+    P_Omega_inv = P.T @ Omega_inv\n+    tau_Sigma_inv = np.linalg.inv(tau * Sigma)\n+\n+    # # Older method\n+    # b = P @ Sigma\n+    # A = tau * b @ P.T + Omega\n+    # B = b.T @ np.linalg.solve(A, b)\n+    # return (1.0 + tau) * Sigma - tau**2 * B\n+\n+    M = np.linalg.inv(tau_Sigma_inv + P_Omega_inv @ P)\n+    return Sigma + M\n+\n+\n def cov_to_corr(cov_matrix):\n     \"\"\"\n     Convert a covariance matrix to a correlation matrix.\n",
+  "test_patch": "diff --git a/tests/test_expected_returns.py b/tests/test_expected_returns.py\nindex a9f104d0..abbe65da 100644\n--- a/tests/test_expected_returns.py\n+++ b/tests/test_expected_returns.py\n@@ -1,7 +1,7 @@\n import warnings\n import pandas as pd\n import numpy as np\n-from pypfopt import expected_returns\n+from pypfopt import expected_returns, risk_models\n from tests.utilities_for_tests import get_data\n \n \n@@ -118,3 +118,15 @@ def test_ema_historical_return_limit():\n     sma = expected_returns.mean_historical_return(df)\n     ema = expected_returns.ema_historical_return(df, span=1e10)\n     np.testing.assert_array_almost_equal(ema.values, sma.values)\n+\n+\n+def test_black_litterman_return_default():\n+    df = get_data()\n+    Pi = expected_returns.ema_historical_return(df)\n+    Sigma = risk_models.CovarianceShrinkage(df).ledoit_wolf()\n+    Q = pd.Series(0.1, index=Pi.index)\n+    mean = expected_returns.black_litterman_return(Pi, Sigma, Q)\n+    assert isinstance(mean, pd.Series)\n+    assert list(mean.index) == list(df.columns)\n+    assert mean.notnull().all()\n+    assert mean.dtype == \"float64\"\ndiff --git a/tests/test_risk_models.py b/tests/test_risk_models.py\nindex 2c99f6e6..5df1c772 100644\n--- a/tests/test_risk_models.py\n+++ b/tests/test_risk_models.py\n@@ -220,3 +220,13 @@ def test_oracle_approximating():\n     assert list(shrunk_cov.index) == list(df.columns)\n     assert list(shrunk_cov.columns) == list(df.columns)\n     assert not shrunk_cov.isnull().any().any()\n+\n+\n+def test_black_litterman_cov_default():\n+    df = get_data()\n+    Sigma = risk_models.CovarianceShrinkage(df).ledoit_wolf()\n+    S = risk_models.black_litterman_cov(Sigma)\n+    assert S.shape == (20, 20)\n+    assert S.index.equals(df.columns)\n+    assert S.index.equals(S.columns)\n+    assert S.notnull().all().all()\n",
+  "change_type": "feature",
+  "source": "mined",
+  "finance_tags": [
+    "cross_sectional"
+  ],
+  "fail_to_pass": [
+    "tests/test_expected_returns.py::test_black_litterman_return_default",
+    "tests/test_risk_models.py::test_black_litterman_cov_default"
+  ],
+  "pass_to_pass": [
+    "tests/test_expected_returns.py::test_ema_historical_return",
+    "tests/test_expected_returns.py::test_ema_historical_return_frequency",
+    "tests/test_expected_returns.py::test_ema_historical_return_limit",
+    "tests/test_expected_returns.py::test_mean_historical_returns",
+    "tests/test_expected_returns.py::test_mean_historical_returns_dummy",
+    "tests/test_expected_returns.py::test_mean_historical_returns_frequency",
+    "tests/test_expected_returns.py::test_mean_historical_returns_type_warning",
+    "tests/test_expected_returns.py::test_prices_from_returns",
+    "tests/test_risk_models.py::test_cov_to_corr",
+    "tests/test_risk_models.py::test_covariance_shrinkage_init",
+    "tests/test_risk_models.py::test_exp_cov_limits",
+    "tests/test_risk_models.py::test_exp_cov_matrix",
+    "tests/test_risk_models.py::test_ledoit_wolf_constant_correlation",
+    "tests/test_risk_models.py::test_ledoit_wolf_default",
+    "tests/test_risk_models.py::test_ledoit_wolf_raises_not_implemented",
+    "tests/test_risk_models.py::test_ledoit_wolf_single_index",
+    "tests/test_risk_models.py::test_min_cov_det",
+    "tests/test_risk_models.py::test_oracle_approximating",
+    "tests/test_risk_models.py::test_sample_cov_dummy",
+    "tests/test_risk_models.py::test_sample_cov_frequency",
+    "tests/test_risk_models.py::test_sample_cov_real_data",
+    "tests/test_risk_models.py::test_sample_cov_type_warning",
+    "tests/test_risk_models.py::test_semicovariance",
+    "tests/test_risk_models.py::test_semicovariance_benchmark",
+    "tests/test_risk_models.py::test_shrunk_covariance",
+    "tests/test_risk_models.py::test_shrunk_covariance_extreme_delta",
+    "tests/test_risk_models.py::test_shrunk_covariance_frequency"
+  ],
+  "image": "finbench-pyportfolioopt:base"
+}
