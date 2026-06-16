@@ -30,6 +30,25 @@ Each validated task is written to `benchmark/<task_id>/task.json`. A task is
 written only if it passes the soundness gate: at least one test fails on
 `base_commit + test_patch` and passes once the gold patch is applied.
 
+## Verify a task by hand
+
+To watch a task's two-phase check run in its Docker base image (the code before
+and after the gold patch), use the helper script. It checks out `base_commit`,
+applies `test_patch`, runs the tests (the F2P tests should fail), then applies
+`gold_patch` and runs again (they should pass), and prints a verdict against the
+recorded F2P / P2P lists.
+
+```bash
+# report mode: run both phases and print a VALID / INVALID verdict
+uv run python scripts/verify_in_docker.py PyPortfolioOpt-pr-22
+
+# interactive: drop into the prepared container (base + test_patch applied)
+uv run python scripts/verify_in_docker.py qlib-pr-1803 --shell
+```
+
+Needs docker on PATH and the task's base image present locally. Exit code 0 means
+VALID. Pass a path to a `task.json` instead of an id if you prefer.
+
 ## Anatomy of a task
 
 Every `benchmark/<task_id>/task.json` is the serialized `Task` from
@@ -111,5 +130,6 @@ finbench/pipeline.py      collect -> build -> validate -> finalize
 finbench/cli.py           CLI entrypoint
 finbench/repos.yaml       equity-quant repo registry
 finbench/authored_tasks/  authored value-based task YAMLs
+scripts/verify_in_docker.py  run a task's before/after check by hand
 tests/                    unit tests
 ```
