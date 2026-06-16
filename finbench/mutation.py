@@ -197,7 +197,13 @@ def _b64(s: str) -> str:
 
 
 def _build_script(base_commit: str, test_patch: str, f2p: list[str], mutants: list[Mutant]) -> str:
-    nodes = " ".join(shlex.quote(n) for n in f2p)
+    # Run the test FILE paths (as the validator does), not the F2P node ids:
+    # when a repo's pytest rootdir is a subdir (e.g. qlib's pytest.ini lives in
+    # tests/), reported node ids are rootdir-relative and won't resolve as paths
+    # from the repo root. We still judge kills by the F2P node outcomes in JSON.
+    from .diffutils import patch_paths
+
+    nodes = " ".join(shlex.quote(p) for p in patch_paths(test_patch))
     parts = [
         "set -e",
         "cd /workspace/repo",

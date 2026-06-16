@@ -57,5 +57,14 @@ repos:
     python: "3.10"
     numpy: "1.26.4"
     pandas: "2.1.4"
+    # qlib's full dependency set (jupyter, mlflow, cvxpy, matplotlib, pyarrow,
+    # torch via extras) is huge and unnecessary for the unit-level tasks we mine
+    # (pure-Python data-structure / utility tests that only need qlib to import).
+    # So install the package without deps, then add a light runtime set. This is
+    # the only repo with a trimmed install; if a mined test needs more, add it
+    # here. The Cython extension still builds (PEP 517 build isolation).
     install:
-      - pip install -e .
+      - pip install --no-deps -e .
+      - pip install numpy pandas "scipy<=1.15.3" pyyaml filelock "ruamel.yaml>=0.17.38"
+        loguru tqdm dill fire joblib cython pydantic-settings python-dateutil pytz
+        setuptools-scm redis python-redis-lock requests
