@@ -68,3 +68,22 @@ repos:
       - pip install numpy pandas "scipy<=1.15.3" pyyaml filelock "ruamel.yaml>=0.17.38"
         loguru tqdm dill fire joblib cython pydantic-settings python-dateutil pytz
         setuptools-scm redis python-redis-lock requests
+
+  # --- Additional pure-computation finance repos (added to scale the benchmark) ---
+  - name: skfolio
+    repo: skfolio/skfolio
+    default_branch: main
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .
+
+  - name: ffn
+    repo: pmorissette/ffn
+    default_branch: master
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .

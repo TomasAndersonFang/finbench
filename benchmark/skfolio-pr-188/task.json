@@ -1,0 +1,30 @@
+{
+  "task_id": "skfolio-pr-188",
+  "repo": "skfolio/skfolio",
+  "base_commit": "f5c259f34b42c0ae6a6afcc26b8b6d5db651f5f2",
+  "instruction": "[BUG] Moments/covariance/allow single factor models\n\n<!--\r\nWelcome to skfolio, and thanks for contributing!\r\n-->\r\n\r\n#### Reference Issues/PRs\r\nFixes #187 \r\n\r\n\r\n#### What does this implement/fix? Explain your changes.\r\nUses the same \"fix\" as `EmpiricalCovariance` in scikit-learn by casting the resulting covariance matrix to an array if the number of dimensions are 0.\r\n\r\n#### Does your contribution introduce a new dependency? If yes, which one?\r\n\r\nNo.\r\n\r\n#### What should a reviewer concentrate their feedback on?\r\n\r\nNothing special, small PR.\r\n\r\n#### Did you add any tests for the change?\r\n\r\nYes, perhaps should add corresponding test for other risk models (or parameterize the testing suite).\r\n\r\n#### Any other comments?\r\nAdded a Makefile for easier running of formatting and testing, not sure if appreciated, but I find it easier to reference that rather than README, and can be used in CI.\r\n\r\n#### PR checklist\r\n<!--\r\nPlease go through the checklist below. Please feel free to remove points if they are not applicable.\r\n-->\r\n\r\n##### For all contributions\r\n- [x] The PR title starts with either [ENH], [MNT], [DOC], or [BUG]. [BUG] - bugfix, [MNT] - CI, test framework, [ENH] - adding or improving code, [DOC] - writing or improving documentation or docstrings.\r\n\r\n##### For new estimators\r\n- [-] I've added the estimator to the API reference in `docs/api.rst`.\r\n- [-] I've added one or more illustrative usage examples to the docstring and the `examples` section.\r\n\r\n<!--\r\nThanks for contributing!\r\n-->",
+  "gold_patch": "diff --git a/Makefile b/Makefile\nnew file mode 100644\nindex 00000000..ba9ea5a4\n--- /dev/null\n+++ b/Makefile\n@@ -0,0 +1,15 @@\n+.PHONY: pip-format-and-lint pip-test uv-format-and-lint uv-test\n+\n+pip-format-and-lint:\n+\truff check --fix\n+\truff format\n+\n+pip-test:\n+\tpytest\n+\n+uv-format-and-lint:\n+\tuv run ruff check --fix\n+\tuv run ruff format\n+\n+uv-test:\n+\tuv run pytest\ndiff --git a/src/skfolio/moments/covariance/_empirical_covariance.py b/src/skfolio/moments/covariance/_empirical_covariance.py\nindex bd47dfa9..67c0ceb3 100644\n--- a/src/skfolio/moments/covariance/_empirical_covariance.py\n+++ b/src/skfolio/moments/covariance/_empirical_covariance.py\n@@ -96,6 +96,10 @@ def fit(self, X: npt.ArrayLike, y=None) -> \"EmpiricalCovariance\":\n         X = skv.validate_data(self, X)\n         if self.window_size is not None:\n             X = X[-int(self.window_size) :]\n-        covariance = np.cov(X.T, ddof=self.ddof)\n+        covariance = np.cov(X, ddof=self.ddof, rowvar=False)\n+\n+        if covariance.ndim == 0:\n+            covariance = covariance.reshape(1, 1)\n+\n         self._set_covariance(covariance)\n         return self\n",
+  "test_patch": "diff --git a/tests/test_moment/test_covariance/test_covariance.py b/tests/test_moment/test_covariance/test_covariance.py\nindex d35e1f10..1bc0187a 100644\n--- a/tests/test_moment/test_covariance/test_covariance.py\n+++ b/tests/test_moment/test_covariance/test_covariance.py\n@@ -23,6 +23,17 @@ def test_empirical_covariance(self, X):\n         assert model.covariance_.shape == (20, 20)\n         np.testing.assert_almost_equal(model.covariance_, np.cov(X.T))\n \n+    def test_empirical_covariance_single(self, X):\n+        model = EmpiricalCovariance()\n+\n+        X_truncated = X.iloc[:, :1]\n+        model.fit(X_truncated)\n+\n+        assert model.covariance_.shape == (1, 1)\n+        np.testing.assert_almost_equal(\n+            model.covariance_, np.cov(X_truncated, rowvar=False)\n+        )\n+\n \n class TestEWCovariance:\n     def test_ew_covariance(self, X):\n",
+  "change_type": "feature",
+  "source": "mined",
+  "finance_tags": [
+    "precision"
+  ],
+  "fail_to_pass": [
+    "tests/test_moment/test_covariance/test_covariance.py::TestEmpiricalCovariance::test_empirical_covariance_single"
+  ],
+  "pass_to_pass": [
+    "tests/test_moment/test_covariance/test_covariance.py::TestDenoiseCovariance::test_denoise_covariance",
+    "tests/test_moment/test_covariance/test_covariance.py::TestDenoiseCovariance::test_metadata_routing",
+    "tests/test_moment/test_covariance/test_covariance.py::TestDetoneCovariance::test_detone_covariance",
+    "tests/test_moment/test_covariance/test_covariance.py::TestDetoneCovariance::test_metadata_routing",
+    "tests/test_moment/test_covariance/test_covariance.py::TestEWCovariance::test_ew_covariance",
+    "tests/test_moment/test_covariance/test_covariance.py::TestEmpiricalCovariance::test_empirical_covariance",
+    "tests/test_moment/test_covariance/test_covariance.py::TestGerberCovariance::test_gerber_covariance",
+    "tests/test_moment/test_covariance/test_covariance.py::TestGraphicalLassoCV::test_fit",
+    "tests/test_moment/test_covariance/test_covariance.py::TestLedoitWolf::test_fit",
+    "tests/test_moment/test_covariance/test_covariance.py::TestOAS::test_fit",
+    "tests/test_moment/test_covariance/test_covariance.py::TestShrunkCovariance::test_fit"
+  ],
+  "image": "finbench-skfolio:base"
+}
