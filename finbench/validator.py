@@ -116,8 +116,13 @@ def discover_transitions(
 def validate(raw: RawTask, image: str, timeout: int = 1800) -> ValidationResult:
     """Run the two-phase soundness check for one task in a container."""
     script = _build_script(raw)
+    # Feed the script over stdin (bash -s), not argv: with the base64-embedded
+    # gold/test patches the command line otherwise blows past ARG_MAX
+    # ("argument list too long") on larger mined diffs, crashing the run. Same
+    # fix already used in mutation.py and evaluator.py.
     proc = subprocess.run(
-        ["docker", "run", "--rm", image, "bash", "-lc", script],
+        ["docker", "run", "--rm", "-i", image, "bash", "-s"],
+        input=script,
         capture_output=True,
         text=True,
         timeout=timeout,

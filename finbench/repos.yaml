@@ -87,3 +87,40 @@ repos:
     pandas: "2.1.4"
     install:
       - pip install -e .
+      # Older base_commits of ffn import legacy deps that newer ffn dropped or
+      # made optional: `future` (future.utils) and `pandas_datareader` (data.py).
+      # The HEAD-built image lacks them, so old PRs fail to collect. Install them
+      # so historical commits can be checked out and run. `pynose` provides the
+      # `nose` package name on py3 (old tests import nose.tools); classic nose is
+      # broken on 3.10+.
+      - pip install future pandas_datareader pynose
+
+  - name: bt
+    repo: pmorissette/bt
+    default_branch: master
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .
+      # bt depends on ffn, so it inherits the same legacy-import needs at older
+      # base_commits. Old bt tests also import nose.tools (-> pynose).
+      - pip install future pandas_datareader pynose
+
+  - name: quantstats
+    repo: ranaroussi/quantstats
+    default_branch: main
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .
+
+  - name: pyfolio-reloaded
+    repo: stefan-jansen/pyfolio-reloaded
+    default_branch: main
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .
