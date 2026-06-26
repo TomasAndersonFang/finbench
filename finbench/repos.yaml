@@ -124,3 +124,32 @@ repos:
     pandas: "2.1.4"
     install:
       - pip install -e .
+
+  - name: arch
+    repo: bashtage/arch
+    default_branch: main
+    python: "3.10"
+    # arch's build backend requires numpy>=2.0 (builds against the numpy 2 ABI),
+    # so it cannot use the 1.26.4 pin the other repos share. Pin a numpy 2 /
+    # pandas 2.2 pair instead; determinism still holds because tasks run isolated
+    # in this image (invariant 5 is per-repo pinning, not one version everywhere).
+    numpy: "2.0.2"
+    pandas: "2.2.3"
+    install:
+      # arch uses a meson-python EDITABLE install that rebuilds the Cython
+      # extension on import (invoking ninja). With normal build isolation those
+      # tools vanish after the build, so the runtime rebuild after a base_commit
+      # checkout fails ("ninja not found"). Install the build toolchain + numpy
+      # into the image and build with --no-build-isolation so runtime rebuilds
+      # find them.
+      - pip install "numpy==2.0.2" "pandas==2.2.3" ninja meson meson-python cython setuptools_scm
+      - pip install --no-build-isolation -e .
+
+  - name: cvxportfolio
+    repo: cvxgrp/cvxportfolio
+    default_branch: master
+    python: "3.10"
+    numpy: "1.26.4"
+    pandas: "2.1.4"
+    install:
+      - pip install -e .

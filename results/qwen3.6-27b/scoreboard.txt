@@ -1,0 +1,32 @@
+task_id                                  resolved  F2P    P2P    reason
+------------------------------------------------------------------------------
+PyPortfolioOpt-pr-172                    RESOLVED 3/3    1/1    ok
+PyPortfolioOpt-pr-174                    RESOLVED 2/2    13/13   ok
+PyPortfolioOpt-pr-22                     RESOLVED 2/2    15/15   ok
+PyPortfolioOpt-pr-227                      --     0/2    0/0    empty prediction
+PyPortfolioOpt-pr-228                    RESOLVED 2/2    69/69   ok
+PyPortfolioOpt-pr-261                    RESOLVED 1/1    8/8    ok
+PyPortfolioOpt-pr-268                      --     0/10   0/0    empty prediction
+PyPortfolioOpt-pr-29                       --     0/3    0/15   candidate patch failed to apply
+PyPortfolioOpt-pr-335                      --     0/1    0/157  empty prediction
+PyPortfolioOpt-pr-55                       --     0/2    0/27   candidate patch failed to apply
+bt-pr-140                                  --     0/5    0/31   empty prediction
+bt-pr-234                                  --     0/1    33/33   tests not all passing
+bt-pr-382                                  --     0/1    0/70   empty prediction
+bt-pr-484                                  --     0/1    69/69   tests not all passing
+bt-pr-511                                  --     0/9    0/101  candidate patch failed to apply
+ffn-pr-127                                 --     0/1    40/40   tests not all passing
+ffn-pr-196                                 --     0/1    40/42   tests not all passing
+ffn-pr-224                                 --     0/5    0/39   empty prediction
+ffn-pr-285                               RESOLVED 1/1    43/43   ok
+qlib-pr-1803                             RESOLVED 1/1    1/1    ok
+skfolio-pr-132                             --     0/7    0/0    no test results (collection error or crash)
+skfolio-pr-188                           RESOLVED 1/1    11/11   ok
+skfolio-pr-21                              --     0/2    307/307  tests not all passing
+skfolio-pr-212                           RESOLVED 1/1    214/214  ok
+skfolio-pr-221                             --     0/3    0/6    tests not all passing
+skfolio-pr-224                             --     3/8    40/40   tests not all passing
+skfolio-pr-53                            RESOLVED 8/8    0/0    ok
+skfolio-pr-57                              --     0/1    0/0    tests not all passing
+
+resolved 10/28  (35.7%)
